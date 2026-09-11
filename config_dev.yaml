@@ -1,0 +1,10 @@
+collect_data :
+  x : [1, 2, 3, 4]
+  y : [0.5, 1, 0, 2.5]
+  data_labels : [0, 1, 0, 2]
+  labels_name : {0: "Streamer", 1: "Gamer", 2: "E-Sports"}
+
+input_data :
+  x : 2.5
+  y : 2
+  k : 3
