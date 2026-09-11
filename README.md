@@ -5,7 +5,7 @@ A small, from-scratch implementation of the **K-Nearest Neighbors (KNN)** algori
 1. **Distance comparison** — measuring how "close" a new point is to every known point.
 2. **Majority vote** — letting the closest points "vote" on what class the new point belongs to.
 
-No `scikit-learn`, no black box — every step is plain NumPy so you can read and trace exactly what the algorithm does.
+No `scikit-learn`, no black box — every step is plain NumPy so you can read and trace exactly what the algorithm does. The dataset, the test point, and `k` are all driven by a **YAML config file**, so you can experiment without touching a single line of Python.
 
 ---
 
@@ -37,13 +37,14 @@ Every data point in this project has:
 
 Because each point only has two features (`x`, `y`), we can plot every point on a normal 2D scatter plot — that's what makes this project easy to *see and understand* visually, not just read as numbers.
 
-In `main.py`, the example dataset represents three types of gamers:
+The example dataset represents three types of gamers, and now lives in **`config_dev.yaml`** instead of being hardcoded in `main.py`:
 
-```python
-data_x = np.array([1, 2, 3, 4])
-data_y = np.array([0.5, 1, 0, 2.5])
-data_label = np.array([0, 1, 0, 2])
-label_names = {0: "Streamer", 1: "Gamer", 2: "E-Sports"}
+```yaml
+collect_data:
+  x: [1, 2, 3, 4]
+  y: [0.5, 1, 0, 2.5]
+  data_labels: [0, 1, 0, 2]
+  labels_name: {0: "Streamer", 1: "Gamer", 2: "E-Sports"}
 ```
 
 | Point | x | y | label | class name |
@@ -66,7 +67,7 @@ distance = √( (x_i - point_x)² + (y_i - point_y)² )
 ```
 
 ```python
-# Process/Calcuate.py
+# Process/Calculate.py
 def calculate_distance(self, point_x, point_y):
     distances = np.sqrt((self.data_x - point_x) ** 2 + (self.data_y - point_y) ** 2)
     return distances
@@ -107,9 +108,9 @@ def _predict_numeric_label(self, point_x, point_y, k):
 
 ---
 
-## 4. Worked Example (the numbers behind `main.py`)
+## 4. Worked Example (the numbers behind `config_dev.yaml`)
 
-Predicting the class of test point **(2.5, 2)** with **k = 3**, using the dataset above:
+Predicting the class of test point **(2.5, 2)** with **k = 3** (both come from `input_data` in the config), using the dataset above:
 
 | Point | (x, y) | label | distance to (2.5, 2) |
 | --- | --- | --- | --- |
@@ -131,7 +132,7 @@ Running `main.py` prints exactly this:
 Predicted label for point (2.5, 2) with k=3: Streamer
 ```
 
-Try changing `k` in `main.py` (e.g. `k = 1`) to see the vote — and the prediction — change.
+Try changing `k` in `config_dev.yaml` (e.g. `k: 1`) to see the vote — and the prediction — change.
 
 ---
 
@@ -139,25 +140,91 @@ Try changing `k` in `main.py` (e.g. `k = 1`) to see the vote — and the predict
 
 ```text
 K-Nearest-Neighbor/
-├── main.py                # Entry point: builds the dataset, runs prediction, shows plots
-├── requirements.txt        # Python dependencies
+├── main.py                  # Entry point: loads config, builds the dataset, runs prediction, shows plots
+├── config_dev.yaml          # Dataset + test point + k — edit this to experiment, no code changes needed
+├── requirements.txt         # Python dependencies
+├── Load_utils/
+│   └── load_config.py       # load_config(): reads a YAML file into a dict
 └── Process/
-    ├── Data.py            # Data: holds the dataset (x, y, label) as a simple container
-    ├── Calcuate.py         # KNNCalculate: the KNN algorithm itself (distance + vote)
-    └── Plot.py             # Plot: all matplotlib visualization code
+    ├── Data.py               # Data: holds the dataset (x, y, label) as a simple container
+    ├── Calculate.py           # KNNCalculate: the KNN algorithm itself (distance + vote)
+    └── Plot.py                # Plot: all matplotlib visualization code
 ```
 
-Each class has one job (separation of concerns):
+Each piece has one job (separation of concerns):
 
-| Class | File | Responsibility |
+| Module | File | Responsibility |
 | --- | --- | --- |
+| `load_config` | `Load_utils/load_config.py` | Load `config_dev.yaml` into a plain `dict` |
 | `Data` | `Process/Data.py` | Store the dataset points and their colors/labels |
-| `KNNCalculate` | `Process/Calcuate.py` | Distance calculation, nearest-neighbor lookup, majority-vote prediction |
+| `KNNCalculate` | `Process/Calculate.py` | Distance calculation, nearest-neighbor lookup, majority-vote prediction |
 | `Plot` | `Process/Plot.py` | Draw the raw data scatter plot and the KNN decision boundary |
 
 ---
 
-## 6. Setup & Running
+## 6. Configuration (`config_dev.yaml`)
+
+The whole point of the config file is: **change the data, the test point, or `k` without touching `main.py`.**
+
+```yaml
+collect_data:
+  x: [1, 2, 3, 4]
+  y: [0.5, 1, 0, 2.5]
+  data_labels: [0, 1, 0, 2]
+  labels_name: {0: "Streamer", 1: "Gamer", 2: "E-Sports"}
+
+input_data:
+  x: 2.5
+  y: 2
+  k: 3
+```
+
+| Section | Key | Meaning |
+| --- | --- | --- |
+| `collect_data` | `x`, `y` | The training points' coordinates (must be the same length) |
+| `collect_data` | `data_labels` | The class label (integer) for each training point, in the same order as `x`/`y` |
+| `collect_data` | `labels_name` | Maps each numeric label to a human-readable class name, used by `predict_label()` |
+| `input_data` | `x`, `y` | The test point to classify |
+| `input_data` | `k` | How many nearest neighbors to vote with |
+
+`main.py` reads these with a safe, nested `.get(...)` pattern:
+
+```python
+config = load_config("config_dev.yaml")
+data_x = np.array(config.get("collect_data", {}).get("x", [1, 2, 3, 4]))
+test_point_x = config.get("input_data", {}).get("x", 2.5)
+k = config.get("input_data", {}).get("k", 3)
+```
+
+This means every value has a hardcoded fallback baked into `main.py` — if a key (or the whole `collect_data`/`input_data` section) is missing from the YAML, that default is used instead of crashing.
+
+### How `load_config()` works
+
+```python
+# Load_utils/load_config.py
+def load_config(config_path: str) -> dict:
+    with open(config_path, "r", encoding="utf-8-sig") as config_file:
+        config = yaml.safe_load(config_file)
+    return config or {}
+```
+
+- Opens the YAML file with `utf-8-sig` encoding (so it still works even if the file was saved with a BOM, e.g. from some Windows editors/Excel).
+- `yaml.safe_load()` parses the YAML text into a Python `dict`.
+- **`return config or {}`** — important safety net: if the YAML file is empty (no content at all), `yaml.safe_load()` returns `None`, not `{}`. Without this fallback, the very next line in `main.py` (`config.get("collect_data", ...)`) would crash with `AttributeError: 'NoneType' object has no attribute 'get'`. Returning `{}` instead means every `.get(key, default)` call in `main.py` just falls through to its hardcoded default — no crash, no config needed to run the demo.
+
+> ⚠️ Common mistake: if you accidentally clear out `config_dev.yaml`, the project still runs (thanks to the fallback above) — it will just quietly use the built-in defaults instead of your edited values. If your changes don't seem to take effect, double check `config_dev.yaml` still has your content and correct YAML indentation.
+
+### Changing the experiment — no Python required
+
+- **Change `k`:** edit `input_data.k` in `config_dev.yaml`.
+- **Move the test point:** edit `input_data.x` / `input_data.y`.
+- **Add or change training points:** edit `collect_data.x`, `collect_data.y`, `collect_data.data_labels` (keep all three the same length).
+- **Rename classes:** edit `collect_data.labels_name`.
+- **Run a different dataset entirely:** copy `config_dev.yaml` to e.g. `config_prod.yaml`, then change the filename in `main.py`'s `load_config("config_dev.yaml")` call.
+
+---
+
+## 7. Setup & Running
 
 ### Install dependencies
 
@@ -165,7 +232,7 @@ Each class has one job (separation of concerns):
 pip install -r requirements.txt
 ```
 
-> **Note:** `requirements.txt` currently has a typo (`numoy` instead of `numpy`), which will make `pip install` fail or silently skip NumPy. Fix it to `numpy==2.2.6` before installing, or just run `pip install numpy matplotlib` directly.
+This installs `numpy`, `matplotlib`, and `PyYAML` (used by `load_config()` to parse `config_dev.yaml`).
 
 ### Run the example
 
@@ -173,16 +240,19 @@ pip install -r requirements.txt
 python main.py
 ```
 
+> Run this from inside the `K-Nearest-Neighbor/` folder — `load_config("config_dev.yaml")` uses a relative path, so it looks for the file in the current working directory.
+
 This will:
 
-1. Print each training point and its class name.
-2. Open a scatter plot of the raw data (`Plot.plot_data`).
-3. Open a KNN **decision boundary** plot (`Plot.plot_decision_boundary`) — background color shows what class KNN would predict for *any* point in that region, given the current `k`.
-4. Print the predicted class name for the test point.
+1. Load `config_dev.yaml` (or fall back to built-in defaults if a value is missing).
+2. Print each training point and its class name.
+3. Open a scatter plot of the raw data (`Plot.plot_data`).
+4. Open a KNN **decision boundary** plot (`Plot.plot_decision_boundary`) — background color shows what class KNN would predict for *any* point in that region, given the current `k`.
+5. Print the predicted class name for the test point.
 
 ---
 
-## 7. Understanding the Plots
+## 8. Understanding the Plots
 
 ### `Plot.plot_data(data)`
 
@@ -203,7 +273,10 @@ This turns the abstract "distance + vote" math into something you can see direct
 
 ---
 
-## 8. Quick API Reference
+## 9. Quick API Reference
+
+**`load_config(config_path: str) -> dict`** (`Load_utils/load_config.py`)
+Reads a YAML file and returns it as a `dict` (empty `dict` if the file has no content).
 
 **`Data(data_x, data_y, data_label, colors=['red','blue','green'])`**
 Simple container for the dataset. `len(data)` returns the number of points.
@@ -221,25 +294,26 @@ Simple container for the dataset. `len(data)` returns the number of points.
 
 ---
 
-## 9. Things to Try (Exercises)
+## 10. Things to Try (Exercises)
 
-These are good ways to build intuition about KNN using this exact codebase:
+These are good ways to build intuition about KNN using this exact codebase — all doable by editing **`config_dev.yaml` only**, no Python required:
 
-1. **Change `k`** in `main.py` (try `1`, `2`, `4`) and see how the prediction and the decision boundary shape change. Small `k` → boundary follows individual points closely (can overfit / be noisy). Large `k` → boundary gets smoother but may ignore local structure.
-2. **Add more data points** to `data_x` / `data_y` / `data_label` and re-run — watch the decision boundary regions reshape.
-3. **Move the test point** (`test_point_x`, `test_point_y`) around and watch which neighbors light up and how the predicted class changes.
+1. **Change `input_data.k`** (try `1`, `2`, `4`) and see how the prediction and the decision boundary shape change. Small `k` → boundary follows individual points closely (can overfit / be noisy). Large `k` → boundary gets smoother but may ignore local structure.
+2. **Add more points** to `collect_data.x` / `collect_data.y` / `collect_data.data_labels` and re-run — watch the decision boundary regions reshape.
+3. **Move the test point** (`input_data.x`, `input_data.y`) around and watch which neighbors light up and how the predicted class changes.
 4. **Force a tie** on purpose (like the worked example above) and confirm which label wins, to understand the tie-breaking rule.
-5. **Rename `label_names`** to match a real classification problem you care about (e.g. billing tiers, customer segments) instead of Streamer/Gamer/E-Sports.
+5. **Rename `collect_data.labels_name`** to match a real classification problem you care about (e.g. billing tiers, customer segments) instead of Streamer/Gamer/E-Sports.
+6. **Create a second config file** (e.g. `config_prod.yaml`) with a different dataset, then point `main.py`'s `load_config("config_dev.yaml")` call at it to switch experiments without editing any other code.
 
 ---
 
-## 10. Limitations (by design, for learning)
+## 11. Limitations (by design, for learning)
 
 This implementation is intentionally minimal so the algorithm stays readable — it does **not** include things a production KNN would need:
 
 - No feature scaling/normalization — since `x` and `y` are on similar scales here, this doesn't matter for the demo, but with real, differently-scaled features you'd normally standardize features first (distance would otherwise be dominated by whichever feature has the larger numeric range).
 - Only works with 2 features (`x`, `y`) — real KNN generalizes to any number of features/dimensions.
 - Only Euclidean distance is implemented (other options include Manhattan or cosine distance).
-- `k` is chosen manually rather than tuned (e.g. via cross-validation).
+- `k` is set manually in the config rather than tuned automatically (e.g. via cross-validation).
 
 These are great follow-up topics once you're comfortable with the basic distance + majority-vote mechanics shown here.
