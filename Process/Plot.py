@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import Circle
 
 
 class Plot:
@@ -50,17 +51,23 @@ class Plot:
         predictions = np.array([knn._predict_numeric_label(x, y, k) for x, y in grid_points])
         predictions = predictions.reshape(xx.shape)
 
-        plt.figure(figsize=(8, 6))
-        contour = plt.contourf(xx, yy, predictions, alpha=0.3)
-        plt.scatter(knn.data_x, knn.data_y, c=knn.data_label, edgecolor='k', cmap=plt.cm.coolwarm)
-        plt.xlabel('hours streamed per week')
-        plt.ylabel('hours competing per week')
-        plt.title(f'KNN Decision Boundary (k={k})')
+        fig, ax = plt.subplots(figsize=(8, 6))
+        contour = ax.contourf(xx, yy, predictions, alpha=0.3)
+        ax.scatter(knn.data_x, knn.data_y, c=knn.data_label, edgecolor='k', cmap=plt.cm.coolwarm,
+                   zorder=3)
+        ax.set_xlabel('hours streamed per week')
+        ax.set_ylabel('hours competing per week')
+        ax.set_title(f'KNN Decision Boundary (k={k})')
+
+        # สำคัญ: ระยะทางที่ KNN ใช้เป็น Euclidean distance (วงกลมจริงๆ)
+        # ถ้าไม่ล็อกอัตราส่วนแกน x/y ให้เท่ากัน วงกลมที่วาดจะเพี้ยนเป็นวงรี
+        # ทำให้ตีความขอบเขตการค้นหาผิดไป
+        ax.set_aspect('equal', adjustable='box')
 
         if knn.label_names is not None:
             # แปะชื่อกลุ่มบน colorbar แทนตัวเลข label
             unique_labels = sorted(knn.label_names.keys())
-            cbar = plt.colorbar(contour, ticks=unique_labels)
+            cbar = fig.colorbar(contour, ax=ax, ticks=unique_labels)
             cbar.ax.set_yticklabels([knn.label_names[label] for label in unique_labels])
 
         if test_point is not None:
@@ -68,21 +75,34 @@ class Plot:
             distances = knn.calculate_distance(test_x, test_y)
             nearest_indices = np.argsort(distances)[:k]
 
+            # รัศมีของวง K = ระยะทางที่ไกลที่สุดในบรรดา k เพื่อนบ้านที่ใกล้ที่สุด
+            # นี่คือ "ขอบเขตการค้นหา" จริงๆ ของ KNN ที่จุดนี้ วาดเป็นวงกลมประ
+            # เพื่อให้เห็นชัดว่า k เพื่อนบ้านที่เลือกมาอยู่ในรัศมีเท่าไหร่
+            k_radius = distances[nearest_indices].max()
+            search_circle = Circle((test_x, test_y), k_radius, fill=False,
+                                    edgecolor='black', linestyle=':', linewidth=2,
+                                    zorder=2, label=f'Search radius (k={k}) = {k_radius:.2f}')
+            ax.add_patch(search_circle)
+
             # เส้นประเชื่อมจากจุด test ไปยัง k เพื่อนบ้านที่ใกล้ที่สุด
             for idx in nearest_indices:
-                plt.plot([test_x, knn.data_x[idx]], [test_y, knn.data_y[idx]],
-                         color='black', linestyle='--', linewidth=1, zorder=2)
+                ax.plot([test_x, knn.data_x[idx]], [test_y, knn.data_y[idx]],
+                        color='black', linestyle='--', linewidth=1, zorder=2)
 
             # ไฮไลต์จุดเพื่อนบ้าน k ตัวที่ใกล้ที่สุด ด้วยวงกลมล้อมรอบ
-            plt.scatter(knn.data_x[nearest_indices], knn.data_y[nearest_indices],
-                        s=250, facecolors='none', edgecolors='black', linewidths=2,
-                        label=f'{k} Nearest Neighbors', zorder=3)
+            ax.scatter(knn.data_x[nearest_indices], knn.data_y[nearest_indices],
+                       s=250, facecolors='none', edgecolors='black', linewidths=2,
+                       label=f'{k} Nearest Neighbors', zorder=4)
 
             # จุด test point เอง
             predicted = knn.predict_label(test_x, test_y, k)
-            plt.scatter(test_x, test_y, marker='*', s=350, c='yellow', edgecolors='black',
-                        linewidths=1.5, label=f'Test point -> {predicted}', zorder=4)
+            ax.scatter(test_x, test_y, marker='*', s=350, c='yellow', edgecolors='black',
+                       linewidths=1.5, label=f'Test point -> {predicted}', zorder=5)
 
-            plt.legend(loc='best')
+            # ขยายขอบเขตกราฟให้เห็นวงกลมเต็มวง เผื่อรัศมีชนขอบ x_range/y_range เดิม
+            ax.set_xlim(min(x_min, test_x - k_radius * 1.1), max(x_max, test_x + k_radius * 1.1))
+            ax.set_ylim(min(y_min, test_y - k_radius * 1.1), max(y_max, test_y + k_radius * 1.1))
+
+            ax.legend(loc='best')
 
         plt.show()
