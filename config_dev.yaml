@@ -8,3 +8,7 @@ input_data :
   x : 2.5
   y : 2
   k : 3
+
+Plot : 
+  xlabel : "hours streamed per week"
+  ylabel : "hours competing per week"

@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from matplotlib.colors import ListedColormap
 
 class Data:
@@ -13,3 +14,18 @@ class Data:
     def __len__(self):
         return len(self.x)
 
+    def show_data(data_x, data_y, data_label, label_names):
+        """
+        แสดงข้อมูลดิบ (x, y, label) พร้อมชื่อกลุ่ม
+        """
+        df = pd.DataFrame(
+            {
+                "point": range(len(data_x)),
+                "x": data_x,
+                "y": data_y,
+                "label": data_label,
+                "name": [label_names[lbl] for lbl in data_label]
+            }
+        )
+        print(df)
+    

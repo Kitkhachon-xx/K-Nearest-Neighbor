@@ -10,22 +10,22 @@ class Plot:
     """
 
     @staticmethod
-    def plot_data(data):
+    def plot_data(data, xlabel, ylabel):
         """
         วาดกราฟจุดข้อมูลดิบ (เดิมคือ Data.plot())
         รับ instance ของ Data
         """
         plt.figure(figsize=(8, 6))
         plt.scatter(data.x, data.y, c=data.label, cmap=data.cmap, edgecolor='k')
-        plt.xlabel('hours streamed per week')
-        plt.ylabel('hours competing per week')
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
         plt.title('Data Points (3 Groups)')
         plt.colorbar(ticks=sorted(set(data.label)), label='Group')
         plt.show()
 
     @staticmethod
     def plot_decision_boundary(knn, k: int, x_range: tuple = None, y_range: tuple = None,
-                                resolution: int = 100, test_point: tuple = None):
+                                resolution: int = 100, test_point: tuple = None, xlabel: str = 'X', ylabel: str = 'Y'):
         """
         วาด decision boundary ของ KNN (เดิมคือ KNNCalculate.plot_decision_boundary())
         รับ instance ของ KNNCalculate เป็น knn
@@ -55,8 +55,8 @@ class Plot:
         contour = ax.contourf(xx, yy, predictions, alpha=0.3)
         ax.scatter(knn.data_x, knn.data_y, c=knn.data_label, edgecolor='k', cmap=plt.cm.coolwarm,
                    zorder=3)
-        ax.set_xlabel('hours streamed per week')
-        ax.set_ylabel('hours competing per week')
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
         ax.set_title(f'KNN Decision Boundary (k={k})')
 
         # สำคัญ: ระยะทางที่ KNN ใช้เป็น Euclidean distance (วงกลมจริงๆ)
